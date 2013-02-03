@@ -1,29 +1,36 @@
-Class BattleshipClient
+class BattleshipClient
  
-  def create_new_game
-    #TODO: send game request
+  def create_new_game 
+    url = "#{@base_url}games/join"
+    params = { :user => @user, :board => @my_board }
+    json_response = post_request url, params
+    handle_game_start_response json_response
   end
 
-  def handle_game_start_response (response)
-    @game_id = response.game_id
+  def handle_game_start_response(response)
+    @game_id = response["game_id"]
+  end
+
+  def take_turn
     request_status
   end
-
-  def initialize
+  
+  def initialize(url, username, board)
     init_board
-    @user = "Mike"
-    @play_mode = :hunt
-    @ships = [5, 4, 3, 3, 2]
-    @current_hits = [] #cells
-    create_new_game
+    @base_url = url
+    @user = username
+    @my_board = board
+    create_new_game 
   end
 
   def init_board
-    (1..10).each do |row|
-      col_index = 1
+    @opp_board = []
+    (0..9).each do |row|
+      @opp_board[row] = []
+      col_index = 0
       ('A'..'J').each do |col|
-        @board[row][col_index] = Cell.new(row, col_index, col+row)
-        col_index++
+        @opp_board[row][col_index] = Cell.new(row, col_index, col+(row+1).to_s)
+        col_index += 1
       end
     end
   end
@@ -31,144 +38,40 @@ Class BattleshipClient
   def shoot
     sleep 0.1
 
-    reset_cell_probabilities
-    if @mode == :hunt
-      @target_cell = hunt
-    else
-      @target_cell = target
-    end
-
+    @target_cell = select_target_cell
     target_label = @target_cell.label
-    #TODO: send shot request with target label
-  end
-
-  def reset_cell_probabilities
-    @board.each do |r|
-      r.each do |c|
-        c.probability = 0
-      end
-    end
-  end
-
-  def get_cell_with_max_probability
-    max = -1
-    @board.each do |r|
-      r.each do |c|
-        if c.probability > max
-          max = c.probability
-          max_cell = c
-      end
-    end
-    max_cell
-  end
-
-  def hunt
-    all_cell_probabilities
-    get_cell_with_max_probability
-  end
-
-  def all_cell_probabilities
-    @ships.each do |ship_length|
-      (1..10).each do |row|
-        (1..10).each do |col|
-          test_ship_here (ship_length, @board[row][col], :horizontal)
-          test_ship_here (ship_length, @board[row][col], :vertical)
-        end
-      end
-    end
-  end
-
-  def target
-    #get cell probabilities around current_hits
-    @current_hits.each do |hit|
-      row = hit.row
-      col = hit.column
-      @ships.each do |ship_length|
-        start_col = col - ship_length - 1
-        (start_col..col).each do |current_column|
-          test_ship_here (ship_length, @board[row][current_column], :horizontal)
-        end
-        start_row = row - ship_length - 1
-        (start_row..row).each do |current_row|
-          test_ship_here (ship_length, @board[current_row][col], :vertical)
-        end
-      end
-    end
-
-    get_cell_with_max_probability
+    
+    url = "#{@base_url}games/fire"
+    params = { :user => @user, :game_id => @game_id, :shot => target_label }
+    puts params
+    response = post_request url, params
+    handle_shot_result response
   end
 
   
-
-  def test_ship_here (ship_size, start_cell, direction)
-    if direction == :horizontal
-      row = start_cell.row
-      end_column = start_cell.column + ship_size - 1
-      fits = true
-      if end_column <= 10
-        (start_cell.column..end_column).each do |col|
-          if @board[row][col].status == :miss || @board[row][col].status == :ship
-            fits = false
-            break
-          end
-        end
-        (start_cell.column..end_column).each do |col|
-          if @board[row][col].status != :hit
-            @board[row][col].probability++
-          end
-        end
-      end
-    else if direction == :vertical
-      col = start_cell.column
-      end_row = start_cell.row + ship_size - 1
-      fits = true
-      if end_row <= 10
-        (start_cell.row..end_row).each do |row|
-          if @board[row][col].status == :miss || @board[row][col].status == :ship
-            fits = false
-            break
-          end
-        end
-        (start_cell.row..end_row).each do |row|
-          if @board[row][col].status != :hit
-            @board[row][col].probability++
-          end
-        end
-      end
+  def handle_shot_result(response)
+    # puts response
+    if response["hit"]
+      @target_cell.state = :hit
+      sunk_ship = response["sunk"]
+    else
+      @target_cell.state = :miss
     end
-  end
-
-  def handle_shot_result (response)
-    if response.hit
-      @mode = :target
-      @current_hits.push(@target_cell)
-      if response.sunk
-        @mode = :hunt
-        remove_ship(response.sunk)
-        #TODO: clear ship cells from hit list and mark them
-      end
-    end
-    
-    # else if miss - change nothing
-    
     request_status
   end
 
-  def remove_ship (ship_length)
-    @ships.delete_at(ships.index(ship_length))
-  end
-
   def request_status
-    #TODO: send request for status
+    url = "#{@base_url}games/status"
+    params = { :user => @user, :game_id => @game_id }
+    response = get_request url, params
+    handle_status_result response
   end
 
-  def handle_status_result (response)
-    if response.game_status == "playing" && response.my_turn
-      shoot
+  def handle_status_result(response)
+    playing = response["game_status"] == "playing"
+    if playing && response["my_turn"]
+        shoot
     end
-    
+    playing
   end
-
 end
-
-

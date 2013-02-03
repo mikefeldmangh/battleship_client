@@ -6,5 +6,10 @@ class Cell
     @column = column
     @label = label
     @state = :unknown
+    @probability = 0
+  end
+  
+  def to_s
+    "label:#{@label} row:#{@row} column:#{@column} state:#{@state} probability:#{@probability}"
   end
 end
