@@ -86,20 +86,14 @@ class SmartBattleshipClient < BattleshipClient
       fits = true
       if end_column < 10
         (start_cell.column..end_column).each do |col|
-          test_cell = @opp_board[row][col]
-          # puts "test H(#{ship_size}): #{test_cell.to_s}"
-          if test_cell.state == :miss || test_cell.state == :ship
+          if !check_cell row, col
             fits = false
             break
           end
         end
         if fits
           (start_cell.column..end_column).each do |col|
-            test_cell = @opp_board[row][col]
-            if test_cell.state != :hit
-              test_cell.probability += 1
-            end
-            # puts "fits H: #{test_cell.to_s}"
+            process_fit_cell row, col
           end
         end
       end
@@ -109,26 +103,37 @@ class SmartBattleshipClient < BattleshipClient
       fits = true
       if end_row < 10
         (start_cell.row..end_row).each do |row|
-          test_cell = @opp_board[row][col]
-          # puts "test V(#{ship_size}): #{test_cell.to_s}"
-          if @opp_board[row][col].state == :miss || @opp_board[row][col].state == :ship
+          if !check_cell row, col
             fits = false
             break
           end
         end
         if fits
           (start_cell.row..end_row).each do |row|
-            test_cell = @opp_board[row][col]
-            if test_cell.state != :hit
-              test_cell.probability += 1
-            end
-            # puts "fits V: #{test_cell.to_s}"
+            process_fit_cell row, col
           end
         end
       end
     end
   end
 
+  def check_cell(row, col)
+    test_cell = @opp_board[row][col]
+    # puts "test V(#{ship_size}): #{test_cell.to_s}"
+    if @opp_board[row][col].state == :miss || @opp_board[row][col].state == :ship
+      false
+    else
+      true
+    end
+  end
+
+  def process_fit_cell(row, col)
+    test_cell = @opp_board[row][col]
+    if test_cell.state != :hit
+      test_cell.probability += 1
+    end
+  end
+  
   def handle_shot_result(response)
     # puts response
     if response["hit"]
